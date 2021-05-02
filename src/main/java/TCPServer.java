@@ -3,51 +3,81 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Scanner;
+import java.util.ArrayList;
+import java.util.List;
 
 public class TCPServer {
 
+    private static TCPServer server;
     private ServerSocket serverSocket;
-    private Socket socket;
-    private DataInputStream in;
-    private DataOutputStream out;
+    private AuthService authService;
+
+    private List<ClientHandler> clients;
 
     public TCPServer(int port) throws IOException {
-        this.serverSocket = new ServerSocket(port);
+        server = this;
+        serverSocket = new ServerSocket(port);
+        clients = new ArrayList<>();
+        authService = new BasicAuth();
+        authService.start();
     }
 
-    public void start() throws IOException {
-        socket = serverSocket.accept();
-        in = new DataInputStream(socket.getInputStream());
-        out = new DataOutputStream(socket.getOutputStream());
-        new Thread(() -> startClientListener()).start();
-        startConsoleListener();
-    }
-
-    private void startClientListener() {
+    public void start() {
         try {
-            String msg;
             while (true) {
-                msg = in.readUTF();
-                System.out.println(msg);
-                if (msg.equals("/end")) {
-                    break;
-                }
+                System.out.println("Ждем подключения клиента");
+                Socket socket = serverSocket.accept();
+                System.out.println("Клиент подключился");
+                new ClientHandler(socket);
             }
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-
-    private void startConsoleListener() {
-        Scanner scanner = new Scanner(System.in);
-        try {
-            while (true) {
-                out.writeUTF(scanner.nextLine());
+        } finally {
+            if (authService != null) {
+                authService.stop();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
         }
     }
 
+    public AuthService getAuthService() {
+        return authService;
+    }
+
+    public synchronized void sendPersonalMessage(ClientHandler fromClient, String toNickName, String message) {
+        for (ClientHandler client : clients) {
+            if (client.getNickName().equals(toNickName)) {
+                client.sendMessage(fromClient.getNickName() + ": " + message);
+                fromClient.sendMessage(toNickName + ": " + message);
+                return;
+            }
+        }
+        fromClient.sendMessage("Участник с ником \"" + toNickName + "\" не найден");
+    }
+
+    public void broadcastMessage(String message) {
+        for (ClientHandler clientHandler : clients) {
+            clientHandler.sendMessage(message);
+        }
+    }
+
+    public synchronized void subscribe(ClientHandler clientHandler) {
+        clients.add(clientHandler);
+    }
+
+    public synchronized void unsubscribe(ClientHandler clientHandler) {
+        clients.remove(clientHandler);
+    }
+
+    public synchronized boolean isNickNameAlreadyExists(String nickName) {
+        for (ClientHandler clientHandler : clients) {
+            if (clientHandler.getNickName().equals(nickName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static TCPServer getServer() {
+        return server;
+    }
 }

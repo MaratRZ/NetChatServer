@@ -46,7 +46,9 @@ public class TCPServer {
     public synchronized void sendPersonalMessage(ClientHandler fromClient, String toNickName, String message) {
         for (ClientHandler client : clients) {
             if (client.getNickName().equals(toNickName)) {
-                client.sendMessage(fromClient.getNickName() + ": " + message);
+                if (!fromClient.getNickName().equals(toNickName)) {
+                    client.sendMessage(fromClient.getNickName() + ": " + message);
+                }
                 fromClient.sendMessage(toNickName + ": " + message);
                 return;
             }

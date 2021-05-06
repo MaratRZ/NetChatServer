@@ -6,12 +6,13 @@ import java.net.Socket;
 public class ClientHandler {
 
     private TCPServer server;
-    Socket socket;
+    private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
     private String nickName;
     private Long lastMessageTime;
     private Long timeOut;
+    private String login;
     private boolean isAuthOk = false;
 
     public ClientHandler(Socket socket) {
@@ -46,7 +47,7 @@ public class ClientHandler {
                     sendMessage("Для авторизации введите логин и пароль");
                     return;
                 }
-                String login = parts[1];
+                login = parts[1];
                 String password = parts[2];
 
                 nickName = server.getAuthService().getNickName(login, password);
@@ -62,8 +63,8 @@ public class ClientHandler {
                     }
                 } else {
                     if (!server.isNickNameAlreadyExists(nickName)) {
-                        sendMessage("/authok");
                         nickName = "Инкогнито";
+                        sendMessage("/authok " + nickName);
                         server.broadcastMessage(nickName + " зашел в чат");
                         server.subscribe(this);
                         timeOut = System.currentTimeMillis();
@@ -108,6 +109,19 @@ public class ClientHandler {
                 String nickNameTo = parts[1];
                 String msg = message.substring(3 + nickNameTo.length() + 1);
                 server.sendPersonalMessage(this, nickNameTo, msg);
+            } else if (message.startsWith("/newnick ")) {
+                String[] parts = message.split(" ");
+                String newNick = parts[1];
+                if (newNick.isEmpty()) {
+                    server.sendPersonalMessage(this, getNickName(), "Требуется указать новый никнейм");
+                } else {
+                    if (server.getAuthService().changeNickName(login, newNick)) {
+                        this.nickName = newNick;
+                        server.sendPersonalMessage(this, getNickName(), "Никнейм изменен");
+                    } else {
+                        server.sendPersonalMessage(this, getNickName(), "Никнейм изменить не удалось");
+                    }
+                }
             } else if (!message.startsWith("/")) {
                 server.broadcastMessage(message);
             }

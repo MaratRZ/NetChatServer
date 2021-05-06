@@ -1,52 +1,68 @@
 import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
 
 public class BaseAuth implements AuthService {
 
-    private static final String url = "jdbc:mysql://localhost:3307/net_chat";
-    private static final String user = "root";
-    private static final String password = "root";
+    private final String url = "jdbc:mysql://localhost:3307/net_chat";
+    private final String user = "root";
+    private final String password = "root";
 
-    private static Connection con;
-    private static Statement stmt;
-    private static ResultSet rs;
-    Map<String, User> users;
+    private Connection conn = null;
+    private PreparedStatement stmt = null;
 
     @Override
     public void start() {
-        String query = "select login, password, nick_name from users";
         try {
-            users = new HashMap<>();
-
-            con = DriverManager.getConnection(url, user, password);
-            stmt = con.createStatement();
-            rs = stmt.executeQuery(query);
-
-            while (rs.next()) {
-                users.put(rs.getString("login"), new User(rs.getString("login"), rs.getString("password"), rs.getString("nick_name")));
-            }
-
-        } catch (SQLException sqlEx) {
-            sqlEx.printStackTrace();
-        } finally {
-            try { rs.close(); } catch(SQLException se) {  }
-            try { stmt.close(); } catch(SQLException se) {  }
-            try { con.close(); } catch(SQLException se) {  }
+            conn = DriverManager.getConnection(url, user, password);
+            System.out.println("Сервис запущен");
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 
     @Override
     public void stop() {
-        System.out.println("Пользователь отключился");
+        try { if (stmt != null && !stmt.isClosed()) stmt.close(); } catch(SQLException e) { e.printStackTrace(); }
+        try { if (conn != null && !conn.isClosed()) conn.close(); } catch(SQLException e) { e.printStackTrace(); }
+        System.out.println("Сервис остановлен");
     }
 
     @Override
     public String getNickName(String login, String password) {
-        User user = users.get(login);
-        if (user != null && user.getPassword().equals(password)) {
-            return user.getNickName();
+        try {
+            if (conn == null || conn.isClosed()) return null;
+
+            stmt = conn.prepareStatement("select nick_name from users where login = ? and password = ?");
+            stmt.setString(1, login);
+            stmt.setString(2, password);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("nick_name");
+            } else {
+                System.out.println("Неправильно введен логин и/или пароль");
+                return null;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return null;
         }
-        return null;
+    }
+
+    @Override
+    public boolean changeNickName(String login, String newNickName) {
+        try {
+            if (conn == null || conn.isClosed()) return false;
+
+            stmt = conn.prepareStatement("update users set nick_name  = ? where login = ?");
+            stmt.setString(1, newNickName);
+            stmt.setString(2, login);
+            int rowsUpdated = stmt.executeUpdate();
+            if (rowsUpdated == 0) {
+                System.out.println("Не удалось сменить никнейм у пользователя с логином " + login);
+            }
+            return rowsUpdated > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 }

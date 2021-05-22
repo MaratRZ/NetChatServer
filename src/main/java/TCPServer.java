@@ -3,12 +3,15 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class TCPServer {
 
     private static TCPServer server;
     private ServerSocket serverSocket;
     private AuthService authService;
+    private ExecutorService executorService;
 
     private List<ClientHandler> clients;
 
@@ -17,6 +20,7 @@ public class TCPServer {
         serverSocket = new ServerSocket(port);
         clients = new ArrayList<>();
         authService = new BaseAuth();
+        executorService = Executors.newCachedThreadPool();
         authService.start();
     }
 
@@ -40,6 +44,7 @@ public class TCPServer {
     public AuthService getAuthService() {
         return authService;
     }
+    public ExecutorService getExecutorService() { return executorService; }
 
     public synchronized void sendPersonalMessage(ClientHandler fromClient, String toNickName, String message) {
         for (ClientHandler client : clients) {

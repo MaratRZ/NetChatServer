@@ -21,7 +21,7 @@ public class ClientHandler {
             this.socket = socket;
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
-            new Thread(() -> {
+            Runnable run = () -> {
                 try {
                     auth();
                     readMessage();
@@ -30,7 +30,8 @@ public class ClientHandler {
                 } finally {
                     closeConnection();
                 }
-            }).start();
+            };
+            server.getExecutorService().execute(run);
         } catch (Exception e) {
             e.printStackTrace();
         }
